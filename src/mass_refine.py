@@ -55,7 +55,8 @@ def refine(sp):
 ### Main Program ###
 ####################
 
-_retry = 5
+_retry = 100
+_wait = 300
 #initialize ee
 Config = ConfigParser.ConfigParser()
 Config.read('.ee-properties')
@@ -118,7 +119,7 @@ for i in range(0,_retry):
         break;
     except:
         print sys.exc_info()[0]
-        time.sleep(10)
+        time.sleep(_wait)
 
 
 
