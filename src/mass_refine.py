@@ -2,6 +2,7 @@ import ee
 import ConfigParser
 import time
 import sys
+import traceback
 
 def refine(sp):
 
@@ -55,8 +56,8 @@ def refine(sp):
 ### Main Program ###
 ####################
 
-_retry = 100
-_wait = 300
+_retry = 10
+_wait = 60
 #initialize ee
 Config = ConfigParser.ConfigParser()
 Config.read('.ee-properties')
@@ -101,8 +102,14 @@ _elev = ee.Image('GME/images/04040405428907908306-08319720230328335274');
 #species_prefs (initial 5 test species) - 1nfFpUT22C2_-F-8QqXiLNksP0CUTOB8sdyF9cfE2
 #species_prefs_amr5 (5 species from amphibians, mammals, reptiles) - 1eLECiqYyrbpqKXx5IT2INq1YrVldEMN8KtZ2SabJ
 #species_prefs_birds100 - 1BC4ZQBvpSv_KJLVaIed__Yk4aIsEL3k_bSIxAPEz
+#species_prefs_birds250_1 - 1SQzKGo8bVmnTylPwjGU2kmQqo3TJ2TmL3aY_PgIf
+#species_prefs_birds250_2 - 1RA92qjA86-XLCjXZ11QEXDzJmPwp0YnqZqv7y2-U
+#species_prefs_birds250_3 - 16EWWSdBRXw2NjLJr9X6EFzxzVRU-pY3n5f-c7oF0
+#species_prefs_birds250_4 - 1MWI-Ustb7VomiWSy3PbgUtlbPBxkMQJyAYxTDpn-
+#species_prefs_birds750 - 1bmNLuf68Zrrq-R9edARVku3bAtJ-R5dQ4QYfnfZm
 #species_prefs_birds1000 - 1tTp8-6xqmcQAtzxG_3WHqrs1wao_O8HgjsfknMnN
-species = ee.FeatureCollection('ft:1tTp8-6xqmcQAtzxG_3WHqrs1wao_O8HgjsfknMnN')
+
+species = ee.FeatureCollection('ft:1bmNLuf68Zrrq-R9edARVku3bAtJ-R5dQ4QYfnfZm')
 
 for i in range(0,_retry):
     try:
@@ -119,6 +126,7 @@ for i in range(0,_retry):
         break;
     except:
         print sys.exc_info()[0]
+        print traceback.format_exc()
         time.sleep(_wait)
 
 
