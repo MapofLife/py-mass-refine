@@ -108,8 +108,10 @@ _elev = ee.Image('GME/images/04040405428907908306-08319720230328335274');
 #species_prefs_birds250_4 - 1MWI-Ustb7VomiWSy3PbgUtlbPBxkMQJyAYxTDpn-
 #species_prefs_birds750 - 1bmNLuf68Zrrq-R9edARVku3bAtJ-R5dQ4QYfnfZm
 #species_prefs_birds1000 - 1tTp8-6xqmcQAtzxG_3WHqrs1wao_O8HgjsfknMnN
+#species_prefs_birds5000 - 1CuSPEyK9Vhtbgk5tluGpJ0kF1VMj5okXH3DhyUTV
 
-species = ee.FeatureCollection('ft:1bmNLuf68Zrrq-R9edARVku3bAtJ-R5dQ4QYfnfZm')
+species = ee.FeatureCollection('ft:1CuSPEyK9Vhtbgk5tluGpJ0kF1VMj5okXH3DhyUTV')
+species = species.filter(ee.Filter.neq('scientificname','Phylloscopus collybita'))
 
 for i in range(0,_retry):
     try:
@@ -127,6 +129,7 @@ for i in range(0,_retry):
     except:
         print sys.exc_info()[0]
         print traceback.format_exc()
+        print "Waiting for %s seconds..." % _wait
         time.sleep(_wait)
 
 
