@@ -27,7 +27,6 @@ def saveRow(dat):
     values = '(%s)' % ','.join([str(i) for i in valList])
 
     sql = 'insert into ' + _table + ' ' + fields + ' values ' + values
-    print sql
     apiKey = '6132d3d852907530a3b047336430fc1999eb0f24'
     url = host + '?' + 'q=' + urllib.quote(sql,'') + '&api_key=' + apiKey
 
@@ -70,6 +69,7 @@ API_KEY = Config.get('Cartodb','APIKey')
 ee.Initialize(ee.ServiceAccountCredentials(MY_SERVICE_ACCOUNT, MY_PRIVATE_KEY_FILE))
 parks = ee.ImageCollection('GME/layers/04040405428907908306-05855266697727638016')
 
+#loop through all species ranges.  use ee to make the intersection with the parks collection
 with open('data/' + _inputfile,'rb') as f:
     reader = csv.DictReader(f)
     recordNum = 1
@@ -77,20 +77,40 @@ with open('data/' + _inputfile,'rb') as f:
         range_ee_id = row['id']
         scientificname = row['name']
         _range = ee.Image('GME/images/' + range_ee_id)
+        success = False;        
         
+        #  put in a try catch block since ee may time out and we just need to try the request again
         for i in range(0,_retry):
             try:
-                print "#%s %s ee .map attempt #%s" % (recordNum,scientificname,i)
+                msg = "#%s %s ee .map attempt #%s" % (recordNum,scientificname,i)
+                print msg
+                logging.info(msg)
                 sumIntersect = parks.map(lambda image: rangeIntersect(image))
                 numParks = sumIntersect.aggregate_count('intersect')
                 inRange = sumIntersect.filter(ee.Filter.gt('intersect',0))
                 numInRange = inRange.aggregate_count('intersect')
-                print "%s numParks: %s, numParksInRange: %s" % (scientificname, numParks.getInfo(),numInRange.getInfo())    
-                                
-                count = 1                
+                msg = "%s: numParks: %s, numParksInRange: %s" % (scientificname, numParks.getInfo(),numInRange.getInfo())
+                print msg
+                logging.info(msg)    
+                success = True
+                break;
+            
+            except:
+                
+                logging.error(sys.exc_info()[0])
+                logging.error(traceback.format_exc())
+                logging.info("Waiting for %s seconds..." % _wait)
+                time.sleep(_wait)
+        #end for
+                
+        if not success:         
+            logging.error("%: Unable to perform refinement in ee" % (scientificname))            
+        else:
+            
+            #now that we have the parks that intersect witht the range, save the intersections to cartodb
+            try:
+                count = 1            
                 for species in inRange.getInfo()['features']:
-                    #p = species['properties']
-
                     dat = {}
                     dat['scientificname'] = scientificname
                     dat['range_ee_id'] = range_ee_id
@@ -98,15 +118,12 @@ with open('data/' + _inputfile,'rb') as f:
                     dat['intersect_area_km2'] = species['properties']['intersect']
                     saveRow(dat)
                     count += 1
-                      
-                break;
-            
-            except:
-                print sys.exc_info()[0]
-                print traceback.format_exc()
-                print "Waiting for %s seconds..." % _wait
-                time.sleep(_wait)
-        #end for
+                #end for
+            except:  
+                logging.error(sys.exc_info()[0])
+                logging.error(traceback.format_exc())
+                logging.error('%: Unable to post record to cartodb for park id: %s' % (scientificname,dat['park_ee_id']))    
+        
         recordNum+=1
     #end for
 #end with
