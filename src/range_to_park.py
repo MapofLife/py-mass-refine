@@ -55,12 +55,12 @@ def rangeIntersect(park):
 ####################
 _inputfile = sys.argv[1]
 _table = sys.argv[2]
-_retry = 10
-_wait = 60
+_retry = 3
+_wait = 30
 #initialize ee
 Config = ConfigParser.ConfigParser()
 Config.read('.ee-properties')
-logging.basicConfig(filename='logs/runlog.txt',level=logging.DEBUG,datefmt='%Y-%m-%d %H:%M:%S')
+logging.basicConfig(filename='logs/runlog.txt',level=logging.DEBUG, filemode='w', datefmt='%Y-%m-%d %H:%M:%S')
 
 MY_SERVICE_ACCOUNT = Config.get('Authentication', 'ServiceAccount')
 MY_PRIVATE_KEY_FILE = Config.get('Authentication', 'PrivateKeyFile')
@@ -76,6 +76,8 @@ with open('data/' + _inputfile,'rb') as f:
     for row in reader:
         range_ee_id = row['id']
         scientificname = row['name']
+        #use for testing a specific species
+        #if scientificname != 'Sterna_paradisaea': continue
         _range = ee.Image('GME/images/' + range_ee_id)
         success = False;        
         
@@ -103,11 +105,13 @@ with open('data/' + _inputfile,'rb') as f:
                 time.sleep(_wait)
         #end for
                 
-        if not success:         
-            logging.error("%: Unable to perform refinement in ee" % (scientificname))            
+        if not success:
+            msg = "FAILURE: %s Unable to perform refinement in ee" % scientificname
+            print msg       
+            logging.error(msg)            
         else:
             
-            #now that we have the parks that intersect witht the range, save the intersections to cartodb
+            #now that we have the parks that intersect with the range, save the intersections to cartodb
             try:
                 count = 1            
                 for species in inRange.getInfo()['features']:
@@ -119,11 +123,17 @@ with open('data/' + _inputfile,'rb') as f:
                     saveRow(dat)
                     count += 1
                 #end for
+                
+                msg = "SUCCESS: %s Successfully processed" % scientificname
+                print msg       
+                logging.info(msg) 
+                
             except:  
                 logging.error(sys.exc_info()[0])
                 logging.error(traceback.format_exc())
                 logging.error('%: Unable to post record to cartodb for park id: %s' % (scientificname,dat['park_ee_id']))    
-        
+            #end try
+             
         recordNum+=1
     #end for
 #end with
