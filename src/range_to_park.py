@@ -77,7 +77,7 @@ with open('data/' + _inputfile,'rb') as f:
         range_ee_id = row['id']
         scientificname = row['name']
         #use for testing a specific species
-        #if scientificname != 'Sterna_paradisaea': continue
+        if scientificname != 'Trogon_violaceus': continue
         _range = ee.Image('GME/images/' + range_ee_id)
         success = False;        
         
@@ -131,7 +131,9 @@ with open('data/' + _inputfile,'rb') as f:
             except:  
                 logging.error(sys.exc_info()[0])
                 logging.error(traceback.format_exc())
-                logging.error('%: Unable to post record to cartodb for park id: %s' % (scientificname,dat['park_ee_id']))    
+                msg = '%s Unable to post record to cartodb for park id: %s' % (scientificname,dat['park_ee_id'])
+                print msg
+                logging.error(msg)    
             #end try
              
         recordNum+=1
