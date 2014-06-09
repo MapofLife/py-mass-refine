@@ -77,7 +77,7 @@ with open('data/' + _inputfile,'rb') as f:
         range_ee_id = row['id']
         scientificname = row['name']
         #use for testing a specific species
-        if scientificname != 'Trogon_violaceus': continue
+        #if scientificname != 'Trogon_violaceus': continue
         _range = ee.Image('GME/images/' + range_ee_id)
         success = False;        
         
