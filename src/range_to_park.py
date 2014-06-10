@@ -74,70 +74,83 @@ with open('data/' + _inputfile,'rb') as f:
     reader = csv.DictReader(f)
     recordNum = 1
     for row in reader:
-        range_ee_id = row['id']
-        scientificname = row['name']
-        #use for testing a specific species
-        #if scientificname != 'Trogon_violaceus': continue
-        _range = ee.Image('GME/images/' + range_ee_id)
-        success = False;        
-        
-        #  put in a try catch block since ee may time out and we just need to try the request again
-        for i in range(0,_retry):
-            try:
-                msg = "#%s %s ee .map attempt #%s" % (recordNum,scientificname,i)
-                print msg
-                logging.info(msg)
-                sumIntersect = parks.map(lambda image: rangeIntersect(image))
-                numParks = sumIntersect.aggregate_count('intersect')
-                inRange = sumIntersect.filter(ee.Filter.gt('intersect',0))
-                numInRange = inRange.aggregate_count('intersect')
-                msg = "%s: numParks: %s, numParksInRange: %s" % (scientificname, numParks.getInfo(),numInRange.getInfo())
-                print msg
-                logging.info(msg)    
-                success = True
-                break;
+        try:
+            scientificname = row['name']  
+            #use for testing a specific species
+            #if scientificname != 'Oryzoborus_crassirostris': continue
+                      
+            msg = "BEGIN: %s started processing" % scientificname         
+            print msg
+            logging.info(msg)
             
-            except:
-                
-                logging.error(sys.exc_info()[0])
-                logging.error(traceback.format_exc())
-                logging.info("Waiting for %s seconds..." % _wait)
-                time.sleep(_wait)
-        #end for
-                
-        if not success:
-            msg = "FAILURE: %s Unable to perform refinement in ee" % scientificname
-            print msg       
-            logging.error(msg)            
-        else:
+            range_ee_id = row['id']
             
-            #now that we have the parks that intersect with the range, save the intersections to cartodb
-            try:
-                count = 1            
-                for species in inRange.getInfo()['features']:
-                    dat = {}
-                    dat['scientificname'] = scientificname
-                    dat['range_ee_id'] = range_ee_id
-                    dat['park_ee_id'] = species['id']
-                    dat['intersect_area_km2'] = species['properties']['intersect']
-                    saveRow(dat)
-                    count += 1
-                #end for
+            _range = ee.Image('GME/images/' + range_ee_id)
+            success = False;        
+            
+            #  put in a try catch block since ee may time out and we just need to try the request again
+            for i in range(0,_retry):
+                try:
+                    msg = "#%s %s ee .map attempt #%s" % (recordNum,scientificname,i)
+                    print msg
+                    logging.info(msg)
+                    sumIntersect = parks.map(lambda image: rangeIntersect(image))
+                    numParks = sumIntersect.aggregate_count('intersect')
+                    inRange = sumIntersect.filter(ee.Filter.gt('intersect',0))
+                    numInRange = inRange.aggregate_count('intersect')
+                    msg = "%s: numParks: %s, numParksInRange: %s" % (scientificname, numParks.getInfo(),numInRange.getInfo())
+                    print msg
+                    logging.info(msg)
+                    success = True
+                    break;
                 
-                msg = "SUCCESS: %s Successfully processed" % scientificname
+                except:
+                    
+                    logging.error(sys.exc_info()[0])
+                    logging.error(traceback.format_exc())
+                    logging.info("Waiting for %s seconds..." % _wait)
+                    time.sleep(_wait)
+            #end for
+                    
+            if not success:
+                msg = "FAILURE: %s Unable to perform refinement in ee" % scientificname
                 print msg       
-                logging.info(msg) 
+                logging.error(msg)            
+            else:
                 
-            except:  
-                logging.error(sys.exc_info()[0])
-                logging.error(traceback.format_exc())
-                msg = '%s Unable to post record to cartodb for park id: %s' % (scientificname,dat['park_ee_id'])
-                print msg
-                logging.error(msg)    
-            #end try
-             
-        recordNum+=1
-    #end for
+                #now that we have the parks that intersect with the range, save the intersections to cartodb
+                try:
+                    count = 1            
+                    for species in inRange.getInfo()['features']:
+                        dat = {}
+                        dat['scientificname'] = scientificname
+                        dat['range_ee_id'] = range_ee_id
+                        dat['park_ee_id'] = species['id']
+                        dat['intersect_area_km2'] = species['properties']['intersect']
+                        saveRow(dat)
+                        count += 1
+                    #end for
+                    
+                    msg = "SUCCESS: %s Successfully processed" % scientificname
+                    print msg       
+                    logging.info(msg) 
+                    
+                except:  
+                    logging.error(sys.exc_info()[0])
+                    logging.error(traceback.format_exc())
+                    msg = '%s Unable to post record to cartodb for park id: %s' % (scientificname,dat['park_ee_id'])
+                    print msg
+                    logging.error(msg)    
+                #end try
+                 
+            recordNum+=1
+        except:
+            msg = "FAILURE: %s Failed to process" % scientificname
+            print msg
+            logging.error(sys.exc_info()[0])
+            logging.error(traceback.format_exc())
+            logging.error(msg)
+    #end for row in reader
 #end with
 
 
