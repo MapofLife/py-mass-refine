@@ -69,16 +69,21 @@ API_KEY = Config.get('Cartodb','APIKey')
 ee.Initialize(ee.ServiceAccountCredentials(MY_SERVICE_ACCOUNT, MY_PRIVATE_KEY_FILE))
 parks = ee.ImageCollection('GME/layers/04040405428907908306-05855266697727638016')
 
+scientificname = "undefined"
+
 try:
     #loop through all species ranges.  use ee to make the intersection with the parks collection
     with open('data/' + _inputfile,'rb') as f:
+        
         reader = csv.DictReader(f)
         recordNum = 1
         for row in reader:
             try:
                 scientificname = row['name']  
-                #use for testing a specific species
-                if scientificname != 'Oryzoborus_crassirostris': continue
+                
+                ####use for testing a specific species
+                #if scientificname != 'Oryzoborus_crassirostris': continue
+                ####use for testing a specific species
                           
                 msg = "#%s BEGIN: %s started processing" % (recordNum,scientificname)         
                 print msg
