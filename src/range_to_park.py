@@ -36,18 +36,19 @@ def saveRow(dat):
     #print url
     
 def rangeIntersect(park):
-    masked = park.mask(_range);
+    intersection = _range.gt(0).mask(park.gt(0))
     #area_image = masked.eq(1).multiply(ee.Image.pixelArea())
+    intersectAreaImg = intersection.eq(1).multiply(ee.Image.pixelArea())
     
-    s = masked.reduceRegion(
+    area = intersectAreaImg.reduceRegion(
                     reducer=ee.Reducer.sum(), 
-                    geometry=_range.geometry(),
+                    geometry=park.geometry(),
                     scale=1000,
                     maxPixels=10000000000,
                     bestEffort=True
                 )
     
-    return ee.Feature(None).set('intersect',s.get('b1')) #s is an object with a property called 'b1' that containst the value we want
+    return ee.Feature(None).set('area_m2',area.get('b1')) #s is an object with a property called 'b1' that containst the value we want
 ##### end refine function
 
 ####################
@@ -82,7 +83,7 @@ try:
                 scientificname = row['name']  
                 
                 ####use for testing a specific species
-                #if scientificname != 'Oryzoborus_crassirostris': continue
+                if scientificname != 'Synallaxis_gujanensis': continue
                 ####use for testing a specific species
                           
                 msg = "#%s BEGIN: %s started processing" % (recordNum,scientificname)         
@@ -101,9 +102,9 @@ try:
                         print msg
                         logging.info(msg)
                         sumIntersect = parks.map(lambda image: rangeIntersect(image))
-                        numParks = sumIntersect.aggregate_count('intersect')
-                        inRange = sumIntersect.filter(ee.Filter.gt('intersect',0))
-                        numInRange = inRange.aggregate_count('intersect')
+                        numParks = sumIntersect.aggregate_count('area_m2')
+                        inRange = sumIntersect.filter(ee.Filter.gt('area_m2',0))
+                        numInRange = inRange.aggregate_count('area_m2')
                         msg = "%s: numParks: %s, numParksInRange: %s" % (scientificname, numParks.getInfo(),numInRange.getInfo())
                         print msg
                         logging.info(msg)
@@ -124,30 +125,36 @@ try:
                     logging.error(msg)            
                 else:
                     
-                    #now that we have the parks that intersect with the range, save the intersections to cartodb
-                    try:
-                        count = 1            
-                        for species in inRange.getInfo()['features']:
+                    #now that we have the parks that intersect with the range, save the intersections to cartodb                    
+                    count = 0
+                    errors = 0            
+                    for species in inRange.getInfo()['features']:
+                        try:
+                            count += 1
                             dat = {}
                             dat['scientificname'] = scientificname
                             dat['range_ee_id'] = range_ee_id
                             dat['park_ee_id'] = species['id']
-                            dat['intersect_area_km2'] = species['properties']['intersect']
-                            saveRow(dat)
-                            count += 1
-                        #end for
+                            dat['intersect_area_km2'] = float(species['properties']['area_m2']) / 10**6 #convert to km2
+                            saveRow(dat)                            
+                        except:
+                            errors += 1  
+                            logging.error(sys.exc_info()[0])
+                            logging.error(traceback.format_exc())
+                            msg = '%s Unable to post record to cartodb for park id: %s' % (scientificname,dat['park_ee_id'])
+                            print msg
+                            logging.error(msg)
+                            
+                    #end for
+                    if errors == 0:
+                        msg = "SUCCESS: %s Posted %s out of %s records to cartodb" % (scientificname,count,count) 
+                    else:
+                        msg = "FAILURE: %s Posted %s out of %s records to cartodb" % (scientificname,count-errors,count)
+                    
+                    print msg
+                    logging.info(msg)                        
                         
-                        msg = "SUCCESS: %s Successfully processed" % scientificname
-                        print msg       
-                        logging.info(msg) 
-                        
-                    except:  
-                        logging.error(sys.exc_info()[0])
-                        logging.error(traceback.format_exc())
-                        msg = '%s Unable to post record to cartodb for park id: %s' % (scientificname,dat['park_ee_id'])
-                        print msg
-                        logging.error(msg)    
-                    #end try
+                #end else
                      
                 recordNum+=1
             except:
