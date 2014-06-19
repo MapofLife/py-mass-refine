@@ -36,7 +36,8 @@ def saveRow(dat):
     #print url
     
 def rangeIntersect(park):
-    intersection = _range.gt(0).mask(park.gt(0))
+    #park = park.reproject("EPSG:4326", None, 1000)
+    intersection = _range.gt(0).And(park.gt(0))
     #area_image = masked.eq(1).multiply(ee.Image.pixelArea())
     intersectAreaImg = intersection.eq(1).multiply(ee.Image.pixelArea())
     
@@ -68,7 +69,12 @@ MY_PRIVATE_KEY_FILE = Config.get('Authentication', 'PrivateKeyFile')
 API_KEY = Config.get('Cartodb','APIKey')
 
 ee.Initialize(ee.ServiceAccountCredentials(MY_SERVICE_ACCOUNT, MY_PRIVATE_KEY_FILE))
-parks = ee.ImageCollection('GME/layers/04040405428907908306-05855266697727638016')
+
+wdpa_brazil = 'GME/layers/04040405428907908306-05855266697727638016' #25 parks in Brazil
+wdpa2014 = 'GME/layers/04040405428907908306-17831398992532573792' #the first 2131 parks
+
+parks = ee.ImageCollection(wdpa_brazil)\
+            .map(lambda i: i.reproject("EPSG:4326", None, 1000))
 
 scientificname = "undefined"
 
@@ -83,7 +89,7 @@ try:
                 scientificname = row['name']  
                 
                 ####use for testing a specific species
-                if scientificname != 'Synallaxis_gujanensis': continue
+                #if scientificname != 'Synallaxis_gujanensis': continue
                 ####use for testing a specific species
                           
                 msg = "#%s BEGIN: %s started processing" % (recordNum,scientificname)         
@@ -92,7 +98,8 @@ try:
                 
                 range_ee_id = row['id']
                 
-                _range = ee.Image('GME/images/' + range_ee_id)
+                _range = ee.Image('GME/images/' + range_ee_id)\
+                            .reproject("EPSG:4326", None, 1000)
                 success = False;        
                 
                 #  put in a try catch block since ee may time out and we just need to try the request again
@@ -101,7 +108,7 @@ try:
                         msg = "%s ee .map attempt #%s" % (scientificname,i)
                         print msg
                         logging.info(msg)
-                        sumIntersect = parks.map(lambda image: rangeIntersect(image))
+                        sumIntersect = parks.filterBounds(_range.geometry()).map(lambda park: rangeIntersect(park)) #
                         numParks = sumIntersect.aggregate_count('area_m2')
                         inRange = sumIntersect.filter(ee.Filter.gt('area_m2',0))
                         numInRange = inRange.aggregate_count('area_m2')
