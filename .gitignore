@@ -46,5 +46,8 @@ docs/_build/
 # Earth Engine properties file
 .ee-properties
 
+#output files
+output.csv
+
 # Folders to ignore
 /logs

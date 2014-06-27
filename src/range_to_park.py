@@ -9,7 +9,13 @@ import urllib
 import urllib2
 import logging
 
-def saveRow(dat):
+def saveRow(dat,method):
+    if method == _save_cartodb:
+        saveToCartodb(dat)
+    elif method == _save_csv:
+        saveToCSV(dat)
+        
+def saveToCartodb(dat):
 
     host = 'http://mol.cartodb.com/api/v2/sql'
 
@@ -27,29 +33,43 @@ def saveRow(dat):
     values = '(%s)' % ','.join([str(i) for i in valList])
 
     sql = 'insert into ' + _table + ' ' + fields + ' values ' + values
-    apiKey = '6132d3d852907530a3b047336430fc1999eb0f24'
-    url = host + '?' + 'q=' + urllib.quote(sql,'') + '&api_key=' + apiKey
+
+    url = host + '?' + 'q=' + urllib.quote(sql,'') + '&api_key=' + API_KEY
 
     logging.info('%s Cartodb url: %s' % (dat['scientificname'],url))
 
     urllib2.urlopen(url)
     #print url
-    
+
+def saveToCSV(dat):
+    with open("output/" + _table + ".csv", 'a') as csvfile:
+                    writer = csv.writer(csvfile, delimiter=',',
+                                        quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
+                    writer.writerow([dat['scientificname'],
+                                     dat['wdpaid'],
+                                     dat['range_ee_id'],
+                                     dat['park_ee_id'],
+                                     dat['intersect_area_km2']
+                                     ])
+                    
 def rangeIntersect(park):
-    #park = park.reproject("EPSG:4326", None, 1000)
-    intersection = _range.gt(0).And(park.gt(0))
-    #area_image = masked.eq(1).multiply(ee.Image.pixelArea())
+
+    #intersection = _range.gt(0).And(park.gt(0)) #raster on raster intersection
+    intersection = _range.clip(park) #feature on raster intersection
+    
     intersectAreaImg = intersection.eq(1).multiply(ee.Image.pixelArea())
     
     area = intersectAreaImg.reduceRegion(
                     reducer=ee.Reducer.sum(), 
-                    geometry=park.geometry(),
+                    geometry=intersection.geometry(),
                     scale=1000,
                     maxPixels=10000000000,
                     bestEffort=True
                 )
-    
-    return ee.Feature(None).set('area_m2',area.get('b1')) #s is an object with a property called 'b1' that containst the value we want
+    #area is an object with a property called 'b1' that containst the value we want
+    return ee.Feature(None)\
+                .set('area_m2',area.get('b1'))\
+                .set('wdpaid',park.get('wdpaid')) #only works if using fusion table with 
 ##### end refine function
 
 ####################
@@ -59,6 +79,9 @@ _inputfile = sys.argv[1]
 _table = sys.argv[2]
 _retry = 3
 _wait = 30
+_save_cartodb = 1
+_save_csv = 2
+
 #initialize ee
 Config = ConfigParser.ConfigParser()
 Config.read('.ee-properties')
@@ -70,14 +93,19 @@ API_KEY = Config.get('Cartodb','APIKey')
 
 ee.Initialize(ee.ServiceAccountCredentials(MY_SERVICE_ACCOUNT, MY_PRIVATE_KEY_FILE))
 
-wdpa_brazil = 'GME/layers/04040405428907908306-05855266697727638016' #25 parks in Brazil
-wdpa2014 = 'GME/layers/04040405428907908306-17831398992532573792' #the first 2131 parks
+#wdpa_brazil = 'GME/layers/04040405428907908306-05855266697727638016' #25 parks in Brazil
+#wdpa2014 = 'GME/layers/04040405428907908306-17831398992532573792' #the first 2131 parks
 
-parks = ee.ImageCollection(wdpa_brazil)\
-            .map(lambda i: i.reproject("EPSG:4326", None, 1000))
+### use for an image collection of parks
+#parks = ee.ImageCollection(wdpa_brazil)\
+#            .map(lambda i: i.reproject("EPSG:4326", None, 1000))
+
+### use for a fusion table of parks
+parks = ee.FeatureCollection("ft:1M26VibUh6o6ozJNc4fxli1N4eCXTY660A4DP6ehX")\
+            .map(lambda park: park.transform("EPSG:4326"))
 
 scientificname = "undefined"
-
+    
 try:
     #loop through all species ranges.  use ee to make the intersection with the parks collection
     with open('data/' + _inputfile,'rb') as f:
@@ -86,10 +114,10 @@ try:
         recordNum = 1
         for row in reader:
             try:
-                scientificname = row['name']  
+                scientificname = row['scientificname']  
                 
                 ####use for testing a specific species
-                #if scientificname != 'Synallaxis_gujanensis': continue
+                if scientificname != 'Leptotila rufaxilla': continue
                 ####use for testing a specific species
                           
                 msg = "#%s BEGIN: %s started processing" % (recordNum,scientificname)         
@@ -108,7 +136,8 @@ try:
                         msg = "%s ee .map attempt #%s" % (scientificname,i)
                         print msg
                         logging.info(msg)
-                        sumIntersect = parks.filterBounds(_range.geometry()).map(lambda park: rangeIntersect(park)) #
+                        sumIntersect = parks.filterBounds(_range.geometry())\
+                                            .map(lambda park: rangeIntersect(park)) #
                         numParks = sumIntersect.aggregate_count('area_m2')
                         inRange = sumIntersect.filter(ee.Filter.gt('area_m2',0))
                         numInRange = inRange.aggregate_count('area_m2')
@@ -140,23 +169,24 @@ try:
                             count += 1
                             dat = {}
                             dat['scientificname'] = scientificname
-                            dat['range_ee_id'] = range_ee_id
+                            dat['wdpaid'] = int(species['properties']['wdpaid'])
+                            dat['range_ee_id'] = range_ee_id                            
                             dat['park_ee_id'] = species['id']
                             dat['intersect_area_km2'] = float(species['properties']['area_m2']) / 10**6 #convert to km2
-                            saveRow(dat)                            
+                            saveRow(dat,_save_csv)                            
                         except:
                             errors += 1  
                             logging.error(sys.exc_info()[0])
                             logging.error(traceback.format_exc())
-                            msg = '%s Unable to post record to cartodb for park id: %s' % (scientificname,dat['park_ee_id'])
+                            msg = '%s Unable to save record for park id: %s' % (scientificname,dat['park_ee_id'])
                             print msg
                             logging.error(msg)
                             
                     #end for
                     if errors == 0:
-                        msg = "SUCCESS: %s Posted %s out of %s records to cartodb" % (scientificname,count,count) 
+                        msg = "SUCCESS: %s Saved %s out of %s records to datastore" % (scientificname,count,count) 
                     else:
-                        msg = "FAILURE: %s Posted %s out of %s records to cartodb" % (scientificname,count-errors,count)
+                        msg = "FAILURE: %s Saved %s out of %s records to datastore" % (scientificname,count-errors,count)
                     
                     print msg
                     logging.info(msg)                        
