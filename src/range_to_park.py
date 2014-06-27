@@ -117,7 +117,7 @@ try:
                 scientificname = row['scientificname']  
                 
                 ####use for testing a specific species
-                if scientificname != 'Leptotila rufaxilla': continue
+                #if scientificname != 'Leptotila rufaxilla': continue
                 ####use for testing a specific species
                           
                 msg = "#%s BEGIN: %s started processing" % (recordNum,scientificname)         
