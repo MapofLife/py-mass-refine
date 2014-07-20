@@ -168,7 +168,7 @@ try:
                         ####loop method ####
                         intersections = []
                         numIntersect = collection.filterBounds(_raster.geometry()).getInfo()
-                        count = 0
+
                         for collRast in numIntersect['features']:
                             
                             try:
@@ -184,11 +184,11 @@ try:
                                 logging.info('area: %s' % area)
                                 if area > 0:
                                     intersections.append(intersection)
-                                if count > 5: break
+
                             except Exception:
                                 logging.error(sys.exc_info()[0])
                                 logging.error(traceback.format_exc())
-                            count = count+1
+
                         #### end loop method ####                        
                         
                         success = True
