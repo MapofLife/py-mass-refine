@@ -135,7 +135,7 @@ try:
                 
                 ####use for testing a specific species or park
                 #if scientificname != 'Leptotila rufaxilla': continue
-                if raster_ee_id != '04040405428907908306-03009765985537131020': continue
+                #if raster_ee_id != '04040405428907908306-03009765985537131020': continue
                 ####use for testing a specific species
                 
                 msg = "#%s BEGIN: %s (%s) started processing" % (recordNum,raster_id,raster_ee_id)         
